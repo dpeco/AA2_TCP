@@ -1,0 +1,11 @@
+﻿  main.cpp
+main.cpp(40): warning C4101: 'receiveBuffer': variable local sin referencia
+main.cpp(41): warning C4101: '_received': variable local sin referencia
+main.cpp(181): warning C4244: 'argumento': conversión de '::size_t' a 'float'; posible pérdida de datos
+main.cpp(198): warning C4244: 'argumento': conversión de 'time_t' a 'unsigned int'; posible pérdida de datos
+  Generando código
+  Generación de código finalizada
+  3 of 297 functions ( 1.0%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    0 functions had inline decision re-evaluated but remain unchanged
+  ClientTaller2.vcxproj -> E:\Yosm\Documents\uni\3r\3r2sem\redes\Redes_Taller2\x64\Release\ClientTaller2.exe
