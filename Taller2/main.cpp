@@ -11,19 +11,20 @@ struct Player {
 	sf::TcpSocket* socket; //o algo del estilo para poder saber su port e identificarlo en la lista de clientes
 };
 
-Player* DetectPlayer(sf::TcpSocket& client, std::vector<Player*> players) { //encuentra player segun socket, dado que hara falta en varias ocasiones creo que sera util
+Player* globalPlayerPtr = new Player;
+
+void DetectPlayer(sf::TcpSocket& client, std::vector<Player*> players) { //encuentra player segun socket, dado que hara falta en varias ocasiones creo que sera util
 	//encontrar player comparando remoteport
 	bool found = false;
 	int i = 0;
 	Player* player = new Player;
-	while (!found) {
+	while (!found && i < players.size()) {
 		if (players[i]->socket->getRemotePort() == client.getRemotePort()) {
-			player = players[i];
+			globalPlayerPtr = players[i];
 			found = true;
 		}
 		i++;
 	}
-	return player;
 }
 
 void ControlServidor()
@@ -55,14 +56,6 @@ void ControlServidor()
 				sf::TcpSocket* client = new sf::TcpSocket;
 				if (listener.accept(*client) == sf::Socket::Done)
 				{
-					//avisamos a todos que se ha conectado un nuevo cliente
-					for (std::list<sf::TcpSocket*>::iterator it = clients.begin(); it != clients.end(); ++it) {
-						sf::TcpSocket& tempSok = **it;
-						std::string newClient = "Se ha conectado un nuevo cliente";
-						sf::Packet packet;
-						packet << newClient;
-						tempSok.send(packet);
-					}
 
 					// Add the new client to the clients list
 					std::cout << "Llega el cliente con puerto: " << client->getRemotePort() << std::endl;
@@ -75,10 +68,6 @@ void ControlServidor()
 					// Add the new client to the selector so that we will
 					// be notified when he sends something
 					selector.add(*client);
-					
-					std::string newClient = "Te has conectado al chat"; sf::Packet packet;
-					packet << newClient;
-					client->send(packet);
 
 				}
 				else
@@ -101,14 +90,16 @@ void ControlServidor()
 
 						if (status == sf::Socket::Done)	{
 
-							//inicializa cosas antes del switch
-							std::string strRec;
-							Player* player;
-							bool used = false;
-
-							player = DetectPlayer(client, players); //identifica al player
+							
 							int command;
-							if (packet >> command) {
+							if (packet >> command) {//inicializa cosas antes del switch
+
+								std::string strRec;
+								bool used = false;
+								sf::Packet newPacket;
+
+								DetectPlayer(client, players); //identifica al player
+
 								switch (command) {
 								case commands::MSG:
 									packet >> strRec;
@@ -117,10 +108,9 @@ void ControlServidor()
 									//Reenviar mensaje a todos los clientes:
 									for (std::list<sf::TcpSocket*>::iterator it2 = clients.begin(); it2 != clients.end(); ++it2) {
 										sf::TcpSocket& tempSok = **it2;
-										sf::Packet packet;
-										
-										packet << commands::MSG << player->name << strRec;
-										tempSok.send(packet);
+
+										newPacket << commands::MSG << globalPlayerPtr->name << strRec;
+										tempSok.send(newPacket);
 									}
 									break;
 								case NOM:
@@ -133,13 +123,22 @@ void ControlServidor()
 									}
 									//si no está usado --> send CON y añade, si lo está --> send DEN
 									if (!used) {
-										player->name = strRec;
-										packet << commands::CON;
-										client.send(packet);
+										globalPlayerPtr->name = strRec;
+										newPacket << commands::CON;
+										client.send(newPacket);
+
+										//avisamos a todos que se ha conectado un nuevo cliente
+										for (std::list<sf::TcpSocket*>::iterator it = clients.begin(); it != clients.end(); ++it) {
+											sf::TcpSocket& tempSok = **it;
+											std::string playerStr = globalPlayerPtr->name;
+											sf::Packet packet;
+											packet << commands::INF << playerStr;
+											tempSok.send(packet);
+										}
 									}
 									else {
-										packet << commands::DEN;
-										client.send(packet);
+										newPacket << commands::DEN;
+										client.send(newPacket);
 									}
 									break;
 								case RDY:
@@ -164,8 +163,27 @@ void ControlServidor()
 							}
 						}
 						else if (status == sf::Socket::Disconnected) {
+
+							DetectPlayer(client, players); //identifica al player
+
+							for (std::list<sf::TcpSocket*>::iterator it2 = clients.begin(); it2 != clients.end(); ++it2) {
+								sf::TcpSocket& tempSok = **it2;
+								sf::Packet newPacket;
+								newPacket << commands::DIS << globalPlayerPtr->name << globalPlayerPtr->name;
+								tempSok.send(newPacket);
+							}
+
 							selector.remove(client);
 							itTemp.push_back(it); //guardamos iterador del socket desconectado
+
+							bool found = false;
+							int i = 0;
+							while (!found && i < players.size()){
+								if (players[i]->socket->getRemotePort() == client.getRemotePort()) {
+									players.erase(players.begin() + i);
+								}
+								i++;
+							}
 							std::cout << "Elimino el socket que se ha desconectado\n";
 						}
 						else {
@@ -193,8 +211,9 @@ void main()
 		ControlServidor();
 	}
 	else {
+		delete globalPlayerPtr;
 		exit(0);
 	}
-
+	delete globalPlayerPtr;
 
 }

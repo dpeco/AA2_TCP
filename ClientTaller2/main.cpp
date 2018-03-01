@@ -8,6 +8,10 @@
 #include <time.h>
 
 #define MAX_MENSAJES 25
+struct Player {
+	std::string name;
+	int score;
+};
 
 std::vector<std::string> aMensajes;
 std::mutex myMutex;
@@ -26,13 +30,10 @@ sf::Color color;
 std::string mensaje;
 
 bool nameEntered = false;
-
+bool nameReply = false;
 enum commands { NOM, DEN, CON, INF, MSG, IMG, WRD, GUD, BAD, WNU, WIN, DIS, END, RNK, RDY};
 
-struct Player {
-	std::string name;
-	int score;
-};
+
 void addMessage(std::string s) {
 	std::lock_guard<std::mutex> guard(myMutex);
 	aMensajes.push_back(s);
@@ -57,29 +58,25 @@ void receiveFunction(sf::TcpSocket* socket, bool* _connected) {
 				switch (command) {
 				case commands::DEN:
 					std::cout << "The name is already in use" << std::endl;
+					nameReply = true;
 					break;
 				case commands::CON: 
 					std::cout << "Your name has been saved" << std::endl;
 					nameEntered = true;
+					nameReply = true;
 					break;
 				case commands::RNK: 
-
-					packet >> str;
-					addMessage(str);
+					//para recibir le ranking
 					break;
 				case commands::INF:
+					//recibimos nombre y printamos que se ha conectado un user nuevo
+					packet >> str;
+					addMessage("EL USUARIO: '" + str + "' SE HA UNIDO A LA PARTIDA");
 					break;
 				case commands::MSG:
 					packet >> str >> str2;
 					addMessage(str + str2);
 
-					if (strcmp(str2.c_str(), " >exit") == 0) {
-						std::cout << "EXIT" << std::endl;
-						//*_connected = false;
-						//std::string exitMessage = " >exit";
-						//socket->send(exitMessage.c_str(), exitMessage.length() + 1);
-						addMessage("OTHER USER DISONNECTED FROM CHAT");
-					}
 					break;
 				case commands::IMG:
 					//recibir la imagen para printarla en window
@@ -100,7 +97,8 @@ void receiveFunction(sf::TcpSocket* socket, bool* _connected) {
 
 					//actualizar scoreboard local, actualizando la puntuacion del jugador que ha acertado
 				case commands::DIS:
-					//poner un mensaje diciendo que alguien se ha desconectado (podria enviar el nombre tbn)
+					packet >> str;
+					addMessage("EL USUARIO: '" + str + "' SE HA DESCONECTADO");
 					break;
 				case commands::END:
 					//mensaje indicando el ganador de la partida, indicando su nombre
@@ -120,12 +118,19 @@ void blockeComunication() {
 	while (!done && (st == sf::Socket::Status::Done) && connected)
 	{
 		//name enter phase
-		std::string lename;
-		std::cout << "Please enter your name: ";
-		std::cin >> lename;
-		sf::Packet newP;
-		newP << commands::NOM << lename;
-		socket.send(newP);
+		while (!nameEntered) {
+			//hacer que el usuario escriba el nombre
+			std::string namePlayer;
+			std::cout << "Please enter your name: ";
+			std::cin >> namePlayer;
+			//enviar nombre
+			sf::Packet newP;
+			newP << commands::NOM << namePlayer;
+			socket.send(newP);
+
+			nameReply = false;
+			while(!nameReply){} //el sistema mas cutre del universo de que espere hasta que el server responda
+		}
 
 		sf::Vector2i screenDimensions(800, 600);
 
@@ -154,7 +159,7 @@ void blockeComunication() {
 		sf::RectangleShape separator(sf::Vector2f(800, 5));
 		separator.setFillColor(sf::Color(200, 200, 200, 255));
 		separator.setPosition(0, 550);
-
+		
 		//window is open
 		while (window.isOpen())
 		{
