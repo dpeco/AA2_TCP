@@ -25,9 +25,14 @@ sf::Socket::Status st;
 sf::Color color;
 std::string mensaje;
 
+bool nameEntered = false;
 
 enum commands { NOM, DEN, CON, INF, MSG, IMG, WRD, GUD, BAD, WNU, WIN, DIS, END, RNK, RDY};
 
+struct Player {
+	std::string name;
+	int score;
+};
 void addMessage(std::string s) {
 	std::lock_guard<std::mutex> guard(myMutex);
 	aMensajes.push_back(s);
@@ -51,13 +56,11 @@ void receiveFunction(sf::TcpSocket* socket, bool* _connected) {
 			if (packet >> command) {
 				switch (command) {
 				case commands::DEN:
-					//el server no guarda el nombre y se repite el proceso de introducir nombre
+					std::cout << "The name is already in use" << std::endl;
 					break;
-				case commands::CON: //temporal para solo recibir 1 string
-					//el server guarda el nombre
-
-					packet >> str;
-					addMessage(str);
+				case commands::CON: 
+					std::cout << "Your name has been saved" << std::endl;
+					nameEntered = true;
 					break;
 				case commands::RNK: 
 
@@ -116,6 +119,13 @@ void blockeComunication() {
 	bool done = false;
 	while (!done && (st == sf::Socket::Status::Done) && connected)
 	{
+		//name enter phase
+		std::string lename;
+		std::cout << "Please enter your name: ";
+		std::cin >> lename;
+		sf::Packet newP;
+		newP << commands::NOM << lename;
+		socket.send(newP);
 
 		sf::Vector2i screenDimensions(800, 600);
 
@@ -145,6 +155,7 @@ void blockeComunication() {
 		separator.setFillColor(sf::Color(200, 200, 200, 255));
 		separator.setPosition(0, 550);
 
+		//window is open
 		while (window.isOpen())
 		{
 			sf::Event evento;
