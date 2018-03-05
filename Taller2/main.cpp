@@ -1,18 +1,19 @@
-#include <SFML\Network.hpp>
 #include <iostream>
 #include <list>
-
+#include "scoreboard.h"
 enum commands { NOM, DEN, CON, INF, MSG, IMG, WRD, GUD, BAD, WNU, WIN, DIS, END, RNK, RDY};
 
-struct Player {
-	std::string name = "tempname";
-	bool ready = false;
-	int score = 0;
-	sf::TcpSocket* socket; //o algo del estilo para poder saber su port e identificarlo en la lista de clientes
-};
 
 Player* globalPlayerPtr = new Player;
 
+int RemainingReady(std::vector<Player*> players) {
+	int readyCount = players.size();
+	int i = 0;
+	for (int i = 0; i < players.size(); i++) {
+		if (players[i]->ready) readyCount--;
+	}
+	return readyCount;
+}
 void DetectPlayer(sf::TcpSocket& client, std::vector<Player*> players) { //encuentra player segun socket, dado que hara falta en varias ocasiones creo que sera util
 	//encontrar player comparando remoteport
 	bool found = false;
@@ -26,10 +27,26 @@ void DetectPlayer(sf::TcpSocket& client, std::vector<Player*> players) { //encue
 		i++;
 	}
 }
-
+void DetectPlayer(int turn, std::vector<Player*> players) { //encuentra player segun turno
+	bool found = false;
+	int i = 0;
+	Player* player = new Player;
+	while (!found && i < players.size()) {
+		if (players[i]->turn == turn) {
+			globalPlayerPtr = players[i];
+			found = true;
+		}
+		i++;
+	}
+}
 void ControlServidor()
 {
 	bool running = true;
+	bool gameStarted = false;
+	int curTurn = 0; //turno actual
+	int playerNumber; //players.size() shortcut
+	int maxTurns;
+	ScoreBoard scoreboard;
 	// Create a socket to listen to new connections
 	sf::TcpListener listener;
 	sf::Socket::Status status = listener.listen(50000);
@@ -48,6 +65,7 @@ void ControlServidor()
 
 	// Endless loop that waits for new connections
 	while (running)	{
+		
 		// Make the selector wait for data on any socket
 		if (selector.wait()) {
 			// Test the listener
@@ -90,14 +108,13 @@ void ControlServidor()
 
 						if (status == sf::Socket::Done)	{
 
-							
 							int command;
 							if (packet >> command) {//inicializa cosas antes del switch
 
 								std::string strRec;
 								bool used = false;
 								sf::Packet newPacket;
-
+								int remainingPlayers;
 								DetectPlayer(client, players); //identifica al player
 
 								switch (command) {
@@ -142,9 +159,40 @@ void ControlServidor()
 									}
 									break;
 								case RDY:
-									/*
-									identifica el jugador y lo setea a ready
-									*/
+									globalPlayerPtr->ready = true;
+									remainingPlayers = RemainingReady(players);
+									//avisamos a todos que el jugador está ready
+									for (std::list<sf::TcpSocket*>::iterator it = clients.begin(); it != clients.end(); ++it) {
+										sf::TcpSocket& tempSok = **it;
+										sf::Packet packet;
+										if (remainingPlayers > 0) {
+											std::string playerStr = globalPlayerPtr->name;
+
+											packet << commands::MSG << "EL JUGADOR " + playerStr + " ESTÁ PREPARADO PARA JUGAR (FALTA(n) " + std::to_string(remainingPlayers)
+												+ " READY(s) PARA EMPEZAR)";
+											tempSok.send(packet);
+										}
+										else if (players.size() == 1) {
+											packet << commands::MSG << "FALTAN MÁS JUGADORES PARA PODER JUGAR";
+											tempSok.send(packet);
+										}
+										else {
+											packet << commands::MSG << "EMPIEZA LA PARTIDA";
+											tempSok.send(packet);
+
+											gameStarted = true;
+										}
+									}
+									//ya que el juego va a empezar, aprovechamos para setear todo lo necesario
+									if (gameStarted) {
+										playerNumber = players.size();
+										maxTurns = playerNumber * 3;
+										//crear orden de los turnos
+										for (int i = 0; i < playerNumber; i++) {
+											players[i]->turn = i;
+											scoreboard.UpdatePlayer(*players[i]);
+										} 
+									}
 									break;
 								case IMG:
 									/*
@@ -198,6 +246,29 @@ void ControlServidor()
 				//std::list<std::list<sf::TcpSocket*>::iterator>::swap(itTemp);
 			}
 		}
+		/*if (gameStarted && curTurn < maxTurns) {
+			//simular turnos
+			std::cout << "Turn: " << curTurn << std::endl;
+			DetectPlayer(curTurn % playerNumber, players);
+			std::string wordStr = "patata"; //pick a word
+			for (std::list<sf::TcpSocket*>::iterator it = clients.begin(); it != clients.end(); ++it) {
+				sf::TcpSocket& tempSok = **it;
+				std::string playerStr = globalPlayerPtr->name;
+				sf::Packet packet;
+				if (globalPlayerPtr->socket->getRemotePort() == tempSok.getRemotePort()) {
+					packet << commands::WRD << wordStr;
+					tempSok.send(packet);
+				}
+				else {
+					int sizeWord = wordStr.size();
+					packet << commands::WNU << playerStr << sizeWord;
+					tempSok.send(packet);
+				}
+			}
+			curTurn++;
+			system("pause");
+		}
+		*/
 	}
 }
 

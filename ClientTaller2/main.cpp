@@ -1,17 +1,11 @@
 #include <SFML\Graphics.hpp>
 #include <SFML\Network.hpp>
-#include <string>
 #include <cstring>
-#include <iostream>
 #include <mutex>
 #include <thread>
 #include <time.h>
-
+#include "scoreboard.h"
 #define MAX_MENSAJES 25
-struct Player {
-	std::string name;
-	int score;
-};
 
 std::vector<std::string> aMensajes;
 std::mutex myMutex;
@@ -52,7 +46,7 @@ void receiveFunction(sf::TcpSocket* socket, bool* _connected) {
 
 			std::string str;
 			std::string str2;
-
+			int integer;
 			int command;
 			if (packet >> command) {
 				switch (command) {
@@ -71,7 +65,7 @@ void receiveFunction(sf::TcpSocket* socket, bool* _connected) {
 				case commands::INF:
 					//recibimos nombre y printamos que se ha conectado un user nuevo
 					packet >> str;
-					addMessage("EL USUARIO: '" + str + "' SE HA UNIDO A LA PARTIDA");
+					addMessage("EL USUARIO: '" + str + "' SE HA UNIDO A LA PARTIDA, (USA EL COMANDO READY PARA EMPEZAR)");
 					break;
 				case commands::MSG:
 					packet >> str >> str2;
@@ -82,19 +76,27 @@ void receiveFunction(sf::TcpSocket* socket, bool* _connected) {
 					//recibir la imagen para printarla en window
 					break;
 				case commands::WRD:
-					//poner un mensaje indicando la palabra que hay que dibujar
+					packet >> str;
+					addMessage("TE TOCA DIBUJAR");
+					addMessage("LA PALABRA QUE DEBES DIBUJAR ES: " + str);
 					break;
 				case commands::WNU:
+					packet >> str;
+					packet >> integer;
+					addMessage("EL USUARIO '" + str + "' VA A DIBUJAR");
+					addMessage("LA PALABRA CONTIENE " + std::to_string(integer) + " LETRAS");
 					break;
 				case commands::BAD:
-					//poner un mensaje indicando que has escrito mal le palabra
+					addMessage("LA PALABRA QUE HAS INTRODUCIDO ES INCORRECTA");
 					break;
 				case commands::GUD:
-					//poner un mensaje indicando que has escrito bien la palabra
+					addMessage("LA PALABRA QUE HAS INTRODUCIDO ES CORRECTA");
 					break;
 				case commands::WIN:
-					//poner mensaje indicando que un jugador ha acertado la palabra
+					packet >> str;
+					packet >> integer;
 
+					addMessage("EL USUARIO '" + str + "' HA ACERTADO. GANA " + std::to_string(integer) + " PUNTOS");
 					//actualizar scoreboard local, actualizando la puntuacion del jugador que ha acertado
 				case commands::DIS:
 					packet >> str;
@@ -129,7 +131,7 @@ void blockeComunication() {
 			socket.send(newP);
 
 			nameReply = false;
-			while(!nameReply){} //el sistema mas cutre del universo de que espere hasta que el server responda
+			while(!nameReply){} //espera a respuesta de server para cambiar este bool
 		}
 
 		sf::Vector2i screenDimensions(800, 600);
@@ -195,6 +197,11 @@ void blockeComunication() {
 							connected = false;
 							done = true;
 							window.close();
+						}
+						else if (strcmp(mensaje.c_str(), "ready") == 0) {
+							sf::Packet newPacket;
+							newPacket << commands::RDY;
+							socket.send(newPacket);
 						}
 						mensaje = "";
 					}
