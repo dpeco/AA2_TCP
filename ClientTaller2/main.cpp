@@ -5,7 +5,11 @@
 #include <thread>
 #include <time.h>
 #include "scoreboard.h"
+#include "Circle.h"
+#include "Chronometer.h"
 #define MAX_MENSAJES 25
+#define SET 0
+#define GET 1
 
 std::vector<std::string> aMensajes;
 std::mutex myMutex;
@@ -23,10 +27,54 @@ sf::Socket::Status st;
 sf::Color color;
 std::string mensaje;
 
+
+//PAINTING + TURN SYSTEM
+enum Mode { DRAWING, WAITING, ANSWERING, WAITINGANSWERS, NOTHING };
+Mode actualMode = Mode::NOTHING;
+bool drawing;
+bool doneDrawing;
+std::vector<Circle> circles;
+sf::Image screenshotImage;
+sf::Texture screenshotTexture;
+sf::Texture* textPTR;
+sf::Sprite screenshotSprite;
+int radius = 5;
+sf::Color circleColor = sf::Color::White;
+sftools::Chronometer chrono;
+bool firstTimeScreenshot = true;
+
+sf::Uint8 *pixels;
+
 bool nameEntered = false;
 bool nameReply = false;
-enum commands { NOM, DEN, CON, INF, MSG, IMG, WRD, GUD, BAD, WNU, WIN, DIS, END, RNK, RDY};
+enum commands { NOM, DEN, CON, INF, MSG, IMG, WRD, GUD, BAD, WNU, WIN, DIS, END, RNK, RDY, TIM};
 
+Mode SetGetMode(int setOrGet, Mode mode) {
+	std::lock_guard<std::mutex> guard(myMutex);
+	//static Mode sMode = Mode::NOTHING;
+	if (setOrGet == SET) {
+		switch (mode)
+		{
+		case DRAWING:
+			if (actualMode != DRAWING) { chrono.reset(true); doneDrawing = false; drawing = false; } // FIRST TIME CHANGING MODE | Setting drawing to false here, if user is still pressing lClick when time runs out we put it to false automaticly.
+			break;
+		case WAITING:
+			if (actualMode != WAITING) { chrono.reset(false); drawing = false; } // FIRST TIME CHANGING MODE
+			break;
+		case ANSWERING:
+			if (actualMode != ANSWERING) { chrono.reset(false); drawing = false; } // FIRST TIME CHANGING MODE
+			break;
+		case WAITINGANSWERS:
+			if (actualMode != WAITINGANSWERS) { chrono.reset(true); drawing = false; std::vector<Circle>().swap(circles); } // FIRST TIME CHANGING MODE
+			break;
+		default:
+			break;
+		}
+		actualMode = mode;
+		
+	}
+	return actualMode;
+}
 
 void addMessage(std::string s) {
 	std::lock_guard<std::mutex> guard(myMutex);
@@ -48,6 +96,7 @@ void receiveFunction(sf::TcpSocket* socket, bool* _connected) {
 			std::string str2;
 			int integer;
 			int command;
+			int pixelsSize;
 			if (packet >> command) {
 				switch (command) {
 				case commands::DEN:
@@ -74,17 +123,48 @@ void receiveFunction(sf::TcpSocket* socket, bool* _connected) {
 					break;
 				case commands::IMG:
 					//recibir la imagen para printarla en window
+					//PROCESS IMAGE:
+					firstTimeScreenshot = true;
+					std::cout << "IMAGE RECEIVED" << std::endl;
+					int imgWidth, imgHeight;
+					packet >> imgWidth;
+					std::cout << "WIDTH" << imgWidth << std::endl;
+					packet >> imgHeight;
+					std::cout << "HEIGHT" << imgHeight << std::endl;
+					pixelsSize = imgWidth * imgHeight * 4;
+					for (int i = 0; i < pixelsSize; i++) {
+						int tempint;
+						sf::Uint8 tempUint;
+						packet >> tempUint;
+						pixels[i] = tempUint;
+						//std::cout << int(pixels[i]) << ", " << std::endl;
+					}
+					std::cout << "IMAGE PASSED TO ARRAY" << std::endl;
+					//CREATE IMAGE THEN TEXTURE THEN SPRITE
+					screenshotImage.create(imgWidth, imgHeight, pixels);
+					std::cout << "IMAGE CREATED FROM ARRAY" << std::endl;
+					//tempTexture.create(imgWidth, imgHeight);
+					//std::cout << "TEXTURE SETTUP" << std::endl;
+					//screenshotTexture.loadFromImage(screenshotImage);
+					//std::cout << "TEXTURE COPIED FROM IMAGE" << std::endl;
+					//screenshotSprite.setTexture(screenshotTexture, true);
+					//std::cout << "SPRITE CREATED FROM TEXTURE" << std::endl;
+					//screenshotSprite.setPosition(0, 0);
+
+					SetGetMode(0, Mode::ANSWERING);
 					break;
 				case commands::WRD:
 					packet >> str;
 					addMessage("TE TOCA DIBUJAR");
 					addMessage("LA PALABRA QUE DEBES DIBUJAR ES: " + str);
+					SetGetMode(0, Mode::DRAWING);
 					break;
 				case commands::WNU:
 					packet >> str;
 					packet >> integer;
 					addMessage("EL USUARIO '" + str + "' VA A DIBUJAR");
 					addMessage("LA PALABRA CONTIENE " + std::to_string(integer) + " LETRAS");
+					SetGetMode(0, Mode::WAITING);
 					break;
 				case commands::BAD:
 					addMessage("LA PALABRA QUE HAS INTRODUCIDO ES INCORRECTA");
@@ -139,6 +219,18 @@ void blockeComunication() {
 		sf::RenderWindow window;
 		window.create(sf::VideoMode(screenDimensions.x, screenDimensions.y), windowName);
 
+		//DRAWING WINDOW:
+		sf::RenderWindow drawingWindow;
+		drawingWindow.create(sf::VideoMode(screenDimensions.x, screenDimensions.y), "Pictionary Drawing Test", sf::Style::Titlebar);
+		drawingWindow.setFramerateLimit(0);
+
+		//Creating texture with window size.
+		sf::Vector2u windowSize = drawingWindow.getSize();
+		textPTR = new sf::Texture();
+		textPTR->create(windowSize.x, windowSize.y);
+
+		pixels = new sf::Uint8[windowSize.x * windowSize.y * 4]; //width * height * 4 -> each pixel = 4 color channel of 8Bit unsigned int: R G B A
+
 		sf::Font font;
 		if (!font.loadFromFile("courbd.ttf"))
 		{
@@ -163,8 +255,9 @@ void blockeComunication() {
 		separator.setPosition(0, 550);
 		
 		//window is open
-		while (window.isOpen())
+		while (window.isOpen() && drawingWindow.isOpen())
 		{
+			sf::Time time = chrono;
 			sf::Event evento;
 			while (window.pollEvent(evento))
 			{
@@ -181,10 +274,13 @@ void blockeComunication() {
 					packet << commands::MSG << exitMessage;
 					socket.send(packet);
 					window.close();
+					drawingWindow.close();
 					break;
 				case sf::Event::KeyPressed:
-					if (evento.key.code == sf::Keyboard::Escape)
+					if (evento.key.code == sf::Keyboard::Escape) {
 						window.close();
+						drawingWindow.close();
+					}
 					else if (evento.key.code == sf::Keyboard::Return) //envia mensaje
 					{
 						sf::Packet packet;
@@ -197,6 +293,7 @@ void blockeComunication() {
 							connected = false;
 							done = true;
 							window.close();
+							drawingWindow.close();
 						}
 						else if (strcmp(mensaje.c_str(), "ready") == 0) {
 							sf::Packet newPacket;
@@ -215,6 +312,63 @@ void blockeComunication() {
 				}
 			}
 
+			//DRAWING EVENTS:
+			sf::Event evnt;
+			while (drawingWindow.pollEvent(evnt) && SetGetMode(1, NOTHING) == Mode::DRAWING) {	//If the actual mode is DRAWING we can draw
+				switch (evnt.type)
+				{
+				case sf::Event::MouseButtonPressed:
+					//Start drawing
+					drawing = true;
+					break;
+				case sf::Event::MouseButtonReleased:
+					//Stop drawing
+					drawing = false;
+					break;
+				default:
+					break;
+				}
+			}
+			
+			//Drawing System: ONLY IF MODE == DRAWING | drawing only is set to true if the mode is Drawing.
+			if (drawing && int(time.asSeconds()) < 30.0f) {
+				circles.push_back(Circle(radius, sf::Color::Black, sf::Mouse::getPosition(drawingWindow)));
+			}
+			else if (int(time.asSeconds()) >= 30.0f && !doneDrawing && SetGetMode(1, Mode::NOTHING) == Mode::DRAWING) {
+				//STOP CHRONO + SAVE IMAGE:
+				chrono.pause();
+				doneDrawing = true;
+				sf::Packet imagePacket;
+				imagePacket << commands::IMG;
+				textPTR = new sf::Texture();
+				textPTR->create(windowSize.x, windowSize.y);
+				textPTR->update(drawingWindow);
+				screenshotImage = textPTR->copyToImage();
+				int pixelsSize = windowSize.x * windowSize.y * 4;
+				imagePacket << windowSize.x << windowSize.y;
+				int counter = 0;
+				for (int i = 0; i < pixelsSize; i++) {
+					counter++;
+					sf::Uint8 _tempUint;
+					_tempUint = screenshotImage.getPixelsPtr()[i];
+					pixels[i] = _tempUint;
+					imagePacket << pixels[i];
+				}
+				std::cout << "MY PIXELS SIZE: " << counter << " | Image Size: " << screenshotImage.getSize().x * screenshotImage.getSize().y * 4 << std::endl;
+				screenshotSprite.setTexture(*textPTR, true);
+				screenshotSprite.setPosition(0, 0);
+				//SEND IMAGE
+				std::cout << "IMAGE SENT AFTER DRAWING" << std::endl;
+				socket.send(imagePacket);
+				chrono.reset(true);
+				SetGetMode(0, Mode::WAITINGANSWERS);
+			}
+			if (doneDrawing && SetGetMode(GET, Mode::NOTHING) == Mode::WAITINGANSWERS && int(time.asSeconds()) >= 30.0f) {
+				//ENVIAR TIME UP CON COMANDO TIM.
+				chrono.pause();
+			}
+			
+	//Draw -------------------------------------------------------------------------------------------------------------------------------
 			window.draw(separator);
 			for (size_t i = 0; i < aMensajes.size(); i++)
 			{
@@ -227,9 +381,33 @@ void blockeComunication() {
 			text.setString(mensaje_);
 			window.draw(text);
 
-
 			window.display();
 			window.clear();
+
+			drawingWindow.clear();
+			if (SetGetMode(1, Mode::NOTHING) == Mode::DRAWING) {
+				if (circles.size() > 0) {
+					for (int i = 0; i < circles.size() - 1; i++) {
+						circles[i].draw(&drawingWindow);
+					}
+				}
+			}
+			else if (SetGetMode(1, Mode::NOTHING) == Mode::ANSWERING || SetGetMode(1, Mode::NOTHING) == Mode::WAITINGANSWERS) {
+				if (firstTimeScreenshot && SetGetMode(1, Mode::NOTHING) == Mode::ANSWERING) {
+					textPTR = new sf::Texture();
+					textPTR->create(windowSize.x, windowSize.y);
+					std::cout << "TEXTURE SETTUP" << std::endl;
+					textPTR->loadFromImage(screenshotImage);
+					std::cout << "TEXTURE COPIED FROM IMAGE" << std::endl;
+					screenshotSprite.setTexture(*textPTR, true);
+					std::cout << "SPRITE CREATED FROM TEXTURE" << std::endl;
+					screenshotSprite.setPosition(0, 0);
+					firstTimeScreenshot = false;
+				}
+				drawingWindow.draw(screenshotSprite);
+			}
+			drawingWindow.display();
+
 		}
 		receiveThread.join();
 	}
@@ -241,6 +419,12 @@ void main() {
 	st = sf::Socket::Status::Disconnected;
 	bool serv;
 	std::string serverMode;
+
+	drawing = false;
+	doneDrawing = false;
+	circles = std::vector<Circle>();
+	
+	chrono.resume();
 
 	std::cout << "Enter (c) for Client: ";
 	std::cin >> connectionType;

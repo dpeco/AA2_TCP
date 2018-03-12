@@ -1,7 +1,7 @@
 #include <iostream>
 #include <list>
 #include "scoreboard.h"
-enum commands { NOM, DEN, CON, INF, MSG, IMG, WRD, GUD, BAD, WNU, WIN, DIS, END, RNK, RDY};
+enum commands { NOM, DEN, CON, INF, MSG, IMG, WRD, GUD, BAD, WNU, WIN, DIS, END, RNK, RDY, TIM };
 
 
 Player* globalPlayerPtr = new Player;
@@ -114,6 +114,9 @@ void ControlServidor()
 								std::string strRec;
 								bool used = false;
 								sf::Packet newPacket;
+								sf::Packet imagePacket;
+								int _w, _h;
+								int arraySize;
 								int remainingPlayers;
 								DetectPlayer(client, players); //identifica al player
 
@@ -134,7 +137,7 @@ void ControlServidor()
 									//compara con el resto de players si ya está usado o no
 									packet >> strRec;
 									for (int i = 0; i < players.size(); i++) {
-										if (strcmp(players[0]->name.c_str(), strRec.c_str()) == 0) {
+										if (strcmp(players[i]->name.c_str(), strRec.c_str()) == 0) {
 											used = true;
 										}
 									}
@@ -185,11 +188,14 @@ void ControlServidor()
 									}
 									//ya que el juego va a empezar, aprovechamos para setear todo lo necesario
 									if (gameStarted) {
+										curTurn = 0;
 										playerNumber = players.size();
 										maxTurns = playerNumber * 3;
 										//crear orden de los turnos
 										for (int i = 0; i < playerNumber; i++) {
 											players[i]->turn = i;
+											if (i == 0) { sf::Packet turnPacket; turnPacket << commands::WRD << "Platano";  players[i]->socket->send(turnPacket); }
+											else { sf::Packet turnPacket; turnPacket << commands::WNU << players[0]->name << 7;  players[i]->socket->send(turnPacket); }
 											scoreboard.UpdatePlayer(*players[i]);
 										} 
 									}
@@ -197,9 +203,32 @@ void ControlServidor()
 								case IMG:
 									/*
 									recibe la imagen dibujada por el cliente que ha dibujado
-
+										RECIBES Y REENVIAS EL MISMO PACKETE SIN MÁS
 									quizá podria aprovechar y reenviar la imagen al resto, dependiendo de al final como va le code xd
 									*/
+									std::cout << "IMAGE RECEIVED" << std::endl;
+									
+									packet >> _w;
+									packet >> _h;
+									arraySize = _w * _h * 4;
+									
+									imagePacket << commands::IMG;
+									imagePacket << _w << _h;
+									for (int index = 0; index < arraySize; index++) {
+										sf::Uint8 tempUint;
+										packet >> tempUint;
+										imagePacket << tempUint;
+									}
+									DetectPlayer(curTurn, players);	//Detect current player that is drawing.
+									for (std::list<sf::TcpSocket*>::iterator it = clients.begin(); it != clients.end(); ++it) {
+										sf::TcpSocket& tempSok = **it;
+										
+										if (globalPlayerPtr->socket->getRemotePort() != tempSok.getRemotePort()) {	//Only send image to everyone except for the drawer. Which is already drawing the image.
+											tempSok.send(imagePacket);
+											std::cout << "IMAGE SENT" << std::endl;
+										}
+									}
+
 									break;
 								case DIS:
 									/*
