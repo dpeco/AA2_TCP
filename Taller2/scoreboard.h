@@ -21,5 +21,6 @@ public:
 	~ScoreBoard() {};
 
 	void UpdatePlayer(Player player); //añade/actualiza jugador
+	void DeletePlayer(Player player); //borra jugador
 	std::string Winner(); //añade/actualiza jugador
 };

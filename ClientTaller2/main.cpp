@@ -184,6 +184,7 @@ void receiveFunction(sf::TcpSocket* socket, bool* _connected) {
 				case commands::DIS:
 					packet >> str;
 					addMessage("EL USUARIO: '" + str + "' SE HA DESCONECTADO");
+					done = true;
 					break;
 				case commands::TIM:
 					addMessage("SE HA ACABADO EL TIEMPO DE ADIVINAR");

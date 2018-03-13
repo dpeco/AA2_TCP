@@ -101,7 +101,6 @@ void ControlServidor()
 					// Add the new client to the selector so that we will
 					// be notified when he sends something
 					selector.add(*client);
-
 				}
 				else
 				{
@@ -183,7 +182,6 @@ void ControlServidor()
 											tempSok.send(newPacket);
 										}
 									}
-									
 									
 									break;
 								case NOM:
@@ -307,44 +305,13 @@ void ControlServidor()
 									break;
 
 								}
-								//simular turno nuevo (hacer que el juego se acabe al llegar a max turns)
-								if (startNewTurn) {
-									startNewTurn = false;
-									curTurn++;
-									if (curTurn < maxTurns) {
-										std::cout << "Turn: " << curTurn << std::endl;
-										DetectPlayer(curTurn % playerNumber, players);
-										word = PickWord(); //pick a word
-										globalCurWord = word;
-										for (std::list<sf::TcpSocket*>::iterator it = clients.begin(); it != clients.end(); ++it) {
-											sf::TcpSocket& tempSok = **it;
-											std::string playerStr = globalPlayerPtr->name;
-											sf::Packet packet;
-											if (globalPlayerPtr->socket->getRemotePort() == tempSok.getRemotePort()) {
-												packet << commands::WRD << word;
-												tempSok.send(packet);
-											}
-											else {
-												int sizeWord = word.size();
-												packet << commands::WNU << playerStr << sizeWord;
-												tempSok.send(packet);
-											}
-										}
-									}
-									else {
-										for (std::list<sf::TcpSocket*>::iterator it2 = clients.begin(); it2 != clients.end(); ++it2) {
-											sf::TcpSocket& tempSok = **it2;
-											newPacket.clear();
-											newPacket << commands::END << scoreboard.Winner();
-											tempSok.send(newPacket);
-										}
-									}
-								}
 							}
 						}
 						else if (status == sf::Socket::Disconnected) {
 
 							DetectPlayer(client, players); //identifica al player
+							if (globalPlayerPtr->turn == curTurn % playerNumber) startNewTurn = true;  //si es el que pinta empieza nuevo turno
+							if (startNewTurn) std::cout << "el k dibujaba se ha desconectado" << std::endl;
 
 							for (std::list<sf::TcpSocket*>::iterator it2 = clients.begin(); it2 != clients.end(); ++it2) {
 								sf::TcpSocket& tempSok = **it2;
@@ -360,7 +327,16 @@ void ControlServidor()
 							int i = 0;
 							while (!found && i < players.size()){
 								if (players[i]->socket->getRemotePort() == client.getRemotePort()) {
+
+									scoreboard.DeletePlayer(*globalPlayerPtr);
 									players.erase(players.begin() + i);
+									if (players.size() == 1) {
+										sf::Packet packet;
+										packet << commands::END << "";
+										players[0]->socket->send(packet);
+										running = false;
+									}
+									found = true;
 								}
 								i++;
 							}
@@ -368,6 +344,47 @@ void ControlServidor()
 						}
 						else {
 							std::cout << "Error al recibir de " << client.getRemotePort() << std::endl;
+						}
+						//simular turno nuevo (hacer que el juego se acabe al llegar a max turns)
+						if (startNewTurn) {
+							startNewTurn = false;
+
+							bool nextTurnPossible = false;
+							while (!nextTurnPossible) {
+								curTurn++;
+								DetectPlayer(curTurn % playerNumber, players);
+								if (globalPlayerPtr->turn == curTurn % playerNumber) { //comprueba que corresponda el turno con el jugador, por si esta desconectado
+									nextTurnPossible = true;
+								}
+							}
+							if (curTurn < maxTurns) {
+								std::cout << "Turn: " << curTurn << std::endl;
+								std::string word = PickWord(); //pick a word
+								globalCurWord = word;
+								for (std::list<sf::TcpSocket*>::iterator it = clients.begin(); it != clients.end(); ++it) {
+									sf::TcpSocket& tempSok = **it;
+									std::string playerStr = globalPlayerPtr->name;
+									sf::Packet packet;
+									if (globalPlayerPtr->socket->getRemotePort() == tempSok.getRemotePort()) {
+										packet << commands::WRD << word;
+										tempSok.send(packet);
+									}
+									else {
+										int sizeWord = word.size();
+										packet << commands::WNU << playerStr << sizeWord;
+										tempSok.send(packet);
+									}
+								}
+							}
+							else {
+								for (std::list<sf::TcpSocket*>::iterator it2 = clients.begin(); it2 != clients.end(); ++it2) {
+									sf::TcpSocket& tempSok = **it2;
+									sf::Packet newPacket;
+									newPacket << commands::END << scoreboard.Winner();
+									tempSok.send(newPacket);
+									running = false;
+								}
+							}
 						}
 					}
 				}
