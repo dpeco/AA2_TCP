@@ -21,4 +21,5 @@ public:
 	~ScoreBoard() {};
 
 	void UpdatePlayer(Player player); //añade/actualiza jugador
+	std::string Winner(); //añade/actualiza jugador
 };

@@ -26,7 +26,8 @@ std::string windowName;
 sf::Socket::Status st;
 sf::Color color;
 std::string mensaje;
-
+float timeToDraw = 10.0f;
+bool done = false;
 
 //PAINTING + TURN SYSTEM
 enum Mode { DRAWING, WAITING, ANSWERING, WAITINGANSWERS, NOTHING };
@@ -152,6 +153,7 @@ void receiveFunction(sf::TcpSocket* socket, bool* _connected) {
 					//screenshotSprite.setPosition(0, 0);
 
 					SetGetMode(0, Mode::ANSWERING);
+					addMessage("COMIENZA EL TIEMPO DE ADIVINAR");
 					break;
 				case commands::WRD:
 					packet >> str;
@@ -176,14 +178,23 @@ void receiveFunction(sf::TcpSocket* socket, bool* _connected) {
 					packet >> str;
 					packet >> integer;
 
-					addMessage("EL USUARIO '" + str + "' HA ACERTADO. GANA " + std::to_string(integer) + " PUNTOS");
+					addMessage("EL USUARIO '" + str + "' HA ACERTADO. TIENE " + std::to_string(integer) + " PUNTOS");
 					//actualizar scoreboard local, actualizando la puntuacion del jugador que ha acertado
+					break;
 				case commands::DIS:
 					packet >> str;
 					addMessage("EL USUARIO: '" + str + "' SE HA DESCONECTADO");
 					break;
+				case commands::TIM:
+					addMessage("SE HA ACABADO EL TIEMPO DE ADIVINAR");
+					SetGetMode(SET, Mode::NOTHING);
+					break;
 				case commands::END:
 					//mensaje indicando el ganador de la partida, indicando su nombre
+					packet >> str;
+					addMessage("EL USUARIO '" + str + "' HA GANADO LA PARTIDA. GG");
+					//desconectar
+					done = true;
 					break;
 
 				}
@@ -196,7 +207,6 @@ void blockeComunication() {
 
 	receiveThread = std::thread(receiveFunction, &socket, &connected);
 
-	bool done = false;
 	while (!done && (st == sf::Socket::Status::Done) && connected)
 	{
 		//name enter phase
@@ -331,10 +341,10 @@ void blockeComunication() {
 			}
 			
 			//Drawing System: ONLY IF MODE == DRAWING | drawing only is set to true if the mode is Drawing.
-			if (drawing && int(time.asSeconds()) < 30.0f) {
+			if (drawing && int(time.asSeconds()) < timeToDraw) {
 				circles.push_back(Circle(radius, sf::Color::Black, sf::Mouse::getPosition(drawingWindow)));
 			}
-			else if (int(time.asSeconds()) >= 30.0f && !doneDrawing && SetGetMode(1, Mode::NOTHING) == Mode::DRAWING) {
+			else if (int(time.asSeconds()) >= timeToDraw && !doneDrawing && SetGetMode(1, Mode::NOTHING) == Mode::DRAWING) {
 				//STOP CHRONO + SAVE IMAGE:
 				chrono.pause();
 				doneDrawing = true;
@@ -360,11 +370,17 @@ void blockeComunication() {
 				//SEND IMAGE
 				std::cout << "IMAGE SENT AFTER DRAWING" << std::endl;
 				socket.send(imagePacket);
-				chrono.reset(true);
 				SetGetMode(0, Mode::WAITINGANSWERS);
+				addMessage("SE HA ACABADO EL TIEMPO DE DIBUJAR");
+				std::cout << "set waiting answers";
 			}
-			if (doneDrawing && SetGetMode(GET, Mode::NOTHING) == Mode::WAITINGANSWERS && int(time.asSeconds()) >= 30.0f) {
+			else if (doneDrawing && SetGetMode(GET, Mode::NOTHING) == Mode::WAITINGANSWERS && int(time.asSeconds()) >= timeToDraw) {
 				//ENVIAR TIME UP CON COMANDO TIM.
+				std::cout << "turn done";
+				sf::Packet newPacket;
+				newPacket << commands::TIM;
+				socket.send(newPacket);
+				chrono.reset(false);
 				chrono.pause();
 			}
 			

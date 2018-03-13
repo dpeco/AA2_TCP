@@ -22,3 +22,6 @@ void ScoreBoard::UpdatePlayer(Player player) {
 	//ordenar
 	std::sort(players.begin(), players.end(), cmpFunc);
 }
+std::string ScoreBoard::Winner() {
+	return players[0].name;
+}
