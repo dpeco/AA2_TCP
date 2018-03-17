@@ -145,11 +145,12 @@ void ControlServidor()
 										std::string tempWord = " >" + globalCurWord;
 										Player* wordPlayer = globalPlayerPtr; //nos guardamos quien esta escribiendo
 										DetectPlayer(curTurn % playerNumber, players); //saber quien esta pintando
-										if (strcmp(tempWord.c_str(), strRec.c_str()) == 0) { //comparar que no correspondan a la misma persona
+										if (strcmp(tempWord.c_str(), strRec.c_str()) == 0) { //comparar que sea la palabra correcta
 											sendWord = false; //no enviar palabra correcta al chat
 											//comprobar si ha sido dibujante o no
-											if (wordPlayer->turn != globalPlayerPtr->turn) {
+											if (wordPlayer->turn != globalPlayerPtr->turn && !wordPlayer->answered) { //asegurarse que no se repitan
 												//gud al jugador, supongo que habria que calcular puntos
+												wordPlayer->answered = true;
 												wordPlayer->score += 1;
 												scoreboard.UpdatePlayer(*wordPlayer);
 												newPacket << commands::GUD;
@@ -348,7 +349,9 @@ void ControlServidor()
 						//simular turno nuevo (hacer que el juego se acabe al llegar a max turns)
 						if (startNewTurn) {
 							startNewTurn = false;
-
+							for (int i = 0; i < players.size(); i++) {
+								players[i]->answered = false;
+							}
 							bool nextTurnPossible = false;
 							while (!nextTurnPossible) {
 								curTurn++;

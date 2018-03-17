@@ -11,6 +11,7 @@ struct Player {
 	int turn; //turno de los jugadores
 	int score = 0;
 	sf::TcpSocket* socket; //o algo del estilo para poder saber su port e identificarlo en la lista de clientes
+	bool answered = false;
 };
 
 class ScoreBoard {

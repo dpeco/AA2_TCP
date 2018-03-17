@@ -1,8 +1,1 @@
-﻿C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\VCTargets\Microsoft.CppBuild.targets(387,5): warning MSB8028: The intermediate directory (x64\Debug\) contains files shared from another project (Taller2.vcxproj).  This can lead to incorrect clean and rebuild behavior.
-  main.cpp
-c:\users\dpeco\documents\github\aa2_tcp\taller2\main.cpp(12): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
-c:\users\dpeco\documents\github\aa2_tcp\taller2\main.cpp(245): warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data
-c:\users\dpeco\documents\github\aa2_tcp\taller2\main.cpp(250): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
-c:\users\dpeco\documents\github\aa2_tcp\taller2\main.cpp(373): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
-  Taller2.vcxproj -> C:\Users\dpeco\Documents\GitHub\AA2_TCP\x64\Debug\Server_AA2_ TCP.exe
-  Taller2.vcxproj -> C:\Users\dpeco\Documents\GitHub\AA2_TCP\x64\Debug\Server_AA2_ TCP.pdb (Partial PDB)
+﻿

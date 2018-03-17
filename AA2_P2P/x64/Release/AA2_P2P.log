@@ -1,0 +1,20 @@
+﻿  main.cpp
+e:\yosm\documents\uni\3r\3r2sem\redes\entrega1\aa2_tcp\aa2_p2p\Circle.h(21): warning C4244: 'argumento': conversión de 'int' a 'float'; posible pérdida de datos
+e:\yosm\documents\uni\3r\3r2sem\redes\entrega1\aa2_tcp\aa2_p2p\Circle.h(22): warning C4244: 'argumento': conversión de 'int' a 'float'; posible pérdida de datos
+e:\yosm\documents\uni\3r\3r2sem\redes\entrega1\aa2_tcp\aa2_p2p\Circle.h(24): warning C4244: 'argumento': conversión de 'int' a 'float'; posible pérdida de datos
+e:\yosm\documents\uni\3r\3r2sem\redes\entrega1\aa2_tcp\aa2_p2p\Circle.h(31): warning C4244: 'argumento': conversión de 'const float' a 'int'; posible pérdida de datos
+main.cpp(157): warning C4267: 'inicializando': conversión de 'size_t' a 'int'; posible pérdida de datos
+main.cpp(319): warning C4267: 'inicializando': conversión de 'size_t' a 'int'; posible pérdida de datos
+main.cpp(126): warning C4101: 'receiveBuffer': variable local sin referencia
+main.cpp(127): warning C4101: '_received': variable local sin referencia
+main.cpp(240): warning C4101: 'tempint': variable local sin referencia
+main.cpp(442): warning C4267: 'inicializando': conversión de 'size_t' a 'int'; posible pérdida de datos
+main.cpp(546): warning C4267: 'inicializando': conversión de 'size_t' a 'int'; posible pérdida de datos
+main.cpp(578): warning C4244: 'argumento': conversión de '::size_t' a 'float'; posible pérdida de datos
+main.cpp(619): warning C4244: 'argumento': conversión de 'time_t' a 'unsigned int'; posible pérdida de datos
+  Generando código
+  3 of 531 functions ( 0.6%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    0 functions had inline decision re-evaluated but remain unchanged
+  Generación de código finalizada
+  AA2_P2P.vcxproj -> E:\Yosm\Documents\uni\3r\3r2sem\redes\entrega1\AA2_TCP\x64\Release\AA2_P2P.exe

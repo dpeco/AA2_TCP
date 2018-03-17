@@ -26,7 +26,7 @@ std::string windowName;
 sf::Socket::Status st;
 sf::Color color;
 std::string mensaje;
-float timeToDraw = 10.0f;
+float timeToDraw = 20.0f;
 bool done = false;
 
 //PAINTING + TURN SYSTEM
